@@ -11,7 +11,7 @@ import pandas as pd
 import plotly
 import plotly.offline as offl
 import plotly.graph_objs as go
-
+import sqlite3
 
 TWITTER_API_KEY = '5sOPB7UPox3jexWEYZ53C6kEJ'
 TWITTER_API_KEY_SECRET = 'G0CwqysE5nR1lFSNxQPKsb38UMLqh4UVxZWRrkZbxtdokNJxTe'
@@ -127,6 +127,7 @@ class TwitterAnalyzer:
         df['url'] = pd.Series([t['url'] for t in trends])
         df['tweet_volume'] = pd.Series([t['tweet_volume'] for t in trends])
         return df
+    
 
 
 # if __name__ == '__main__':
@@ -134,16 +135,65 @@ class TwitterAnalyzer:
 #     api = client.get_twitter_api()
 #     print(api.user_timeline(screen_name='CoreyMSchafer', count=5))
 
-USER = 'CoreyMSchafer'
+
+
+
+USERS = [
+    'CoreyMSchafer', 'raymondh', 'gvanrossum', 'dabeaz', 'nedbat',
+    'rbloggers', 'RLangTip', 'rOpenSci', 'rdpeng', 'xieyihui', 'SciPyTip',
+    'daattali', 'kdnuggets', 'R_Programming'
+]
 
 client = TwitterClient()
 api = client.get_twitter_api()
 client.get_remaining_api_calls()
-tweets = client.get_user_timeline_tweets(user=USER)
+tweets = client.get_user_timeline_tweets(user=USERS[0])
 tweets_df = TwitterAnalyzer.make_tweet_dataframe(tweets=tweets)
 tweets_df = tweets_df[tweets_df['text']
                       .apply(lambda t: not t.startswith('RT @'))]
 tweets_df.head()
+tweets_df.dtypes
+
+
+# TODO: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
+
+
+conn = sqlite3.connect(':memory:')
+c = conn.cursor()
+
+c.execute('CREATE TABLE IF NOT EXISTS twitter_user_timelines '
+             '(screen_name TEXT, id INTEGER, created_at REAL, source TEXT, '
+             'text TEXT, favorite_count INTEGER, retweet_count INTEGER)')
+conn.commit()
+
+c.execute(
+    (
+        'INSERT INTO twitter_user_timelines '
+        '(screen_name, id, created_at, source, text, favorite_count, '
+        'retweet_count) '
+        'VALUES '
+        '(:screen_name, :id, :created_at, :source, :text, :favorite_count, '
+        ':retweet_count)'
+    ),
+    {
+        'screen_name': tweets_df.at[0, 'screen_name'],
+        'id': tweets_df.at[0, 'id'],
+        'created_at': tweets_df.at[0, 'created_at'],
+        'source': tweets_df.at[0, 'source'],
+        'text': tweets_df.at[0, 'text'],
+        'favorite_count': tweets_df.at[0, 'favorite_count'],
+        'retweet_count': tweets_df.at[0, 'retweet_count']
+    }
+)
+
+c.execute('SELECT * FROM twitter_user_timelines')
+print(c.fetchall())
+
+c.close()
+conn.close()
+
+
+
 
 trace1 = go.Scatter({'x': tweets_df['created_at'], 'y': tweets_df['favorite_count'], 'mode': 'lines', 'name': 'Favorites', 'text': ['\n'.join(textwrap.wrap(t)) for t in tweets_df['text']]})
 trace2 = go.Scatter({'x': tweets_df['created_at'], 'y': tweets_df['retweet_count'], 'mode': 'lines', 'name': 'Retweets'})
