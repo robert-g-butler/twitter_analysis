@@ -12,6 +12,7 @@ import plotly
 import plotly.offline as offl
 import plotly.graph_objs as go
 import sqlite3
+import sqlalchemy
 
 TWITTER_API_KEY = '5sOPB7UPox3jexWEYZ53C6kEJ'
 TWITTER_API_KEY_SECRET = 'G0CwqysE5nR1lFSNxQPKsb38UMLqh4UVxZWRrkZbxtdokNJxTe'
@@ -127,15 +128,6 @@ class TwitterAnalyzer:
         df['url'] = pd.Series([t['url'] for t in trends])
         df['tweet_volume'] = pd.Series([t['tweet_volume'] for t in trends])
         return df
-    
-
-
-# if __name__ == '__main__':
-#     client = TwitterClient()
-#     api = client.get_twitter_api()
-#     print(api.user_timeline(screen_name='CoreyMSchafer', count=5))
-
-
 
 
 USERS = [
@@ -154,31 +146,50 @@ tweets_df = tweets_df[tweets_df['text']
 tweets_df.head()
 tweets_df.dtypes
 
-
 # TODO: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
+
+engine = sqlalchemy.create_engine('sqlite://', echo=False)
+
+tweets_df.to_sql(name='user_tweets', con=engine)
+
+sqlalchemy.sql.select(columns=[''])
+
+pd.DataFrame().to_sql()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 conn = sqlite3.connect(':memory:')
 c = conn.cursor()
 
 c.execute('CREATE TABLE IF NOT EXISTS twitter_user_timelines '
-             '(screen_name TEXT, id INTEGER, created_at REAL, source TEXT, '
+             '(screen_name TEXT, id INTEGER, source TEXT, '
              'text TEXT, favorite_count INTEGER, retweet_count INTEGER)')
 conn.commit()
 
 c.execute(
     (
         'INSERT INTO twitter_user_timelines '
-        '(screen_name, id, created_at, source, text, favorite_count, '
+        '(screen_name, id, source, text, favorite_count, '
         'retweet_count) '
         'VALUES '
-        '(:screen_name, :id, :created_at, :source, :text, :favorite_count, '
+        '(:screen_name, :id, :source, :text, :favorite_count, '
         ':retweet_count)'
     ),
     {
         'screen_name': tweets_df.at[0, 'screen_name'],
         'id': tweets_df.at[0, 'id'],
-        'created_at': tweets_df.at[0, 'created_at'],
+        #'created_at': tweets_df.at[0, 'created_at'],
         'source': tweets_df.at[0, 'source'],
         'text': tweets_df.at[0, 'text'],
         'favorite_count': tweets_df.at[0, 'favorite_count'],
@@ -187,7 +198,7 @@ c.execute(
 )
 
 c.execute('SELECT * FROM twitter_user_timelines')
-print(c.fetchall())
+[print(row) for row in c.fetchall()]
 
 c.close()
 conn.close()
